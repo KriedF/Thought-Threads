@@ -62,13 +62,16 @@ function App() {
 
       const data = await response.json();
 
-      if (data.thought) {
+      // Handle multiple skills (comma-separated)
+      if (data.thoughts && data.thoughts.length > 0) {
+        setThoughts(prev => [...prev, ...data.thoughts]);
+        setInputValue('');
+      } else if (data.thought) {
         setThoughts(prev => [...prev, data.thought]);
-        setConnections(prev => [...prev, ...data.connections]);
         setInputValue('');
       }
     } catch (error) {
-      console.error('Error adding thought:', error);
+      console.error('Error adding skill:', error);
     }
   };
 
@@ -151,16 +154,13 @@ function App() {
 
     simulationRef.current = simulation;
 
-    // Draw links
+    // Skip drawing links - cleaner visualization without connection lines
     const link = container.append('g')
       .attr('class', 'links')
       .selectAll('line')
-      .data(links)
+      .data([])  // Empty - no lines
       .enter()
-      .append('line')
-      .attr('stroke', '#ffffff')
-      .attr('stroke-opacity', d => d.strength * 0.3 + 0.1)
-      .attr('stroke-width', d => d.strength * 2 + 0.5);
+      .append('line');
 
     // Draw nodes
     const node = container.append('g')

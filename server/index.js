@@ -347,7 +347,7 @@ app.get('/api/thoughts', (req, res) => {
   }
 });
 
-// Add a new thought
+// Add a new thought (or multiple comma-separated skills)
 app.post('/api/thoughts', (req, res) => {
   try {
     const { content } = req.body;
@@ -356,77 +356,49 @@ app.post('/api/thoughts', (req, res) => {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    // Extract keywords
-    const keywords = extractKeywords(content);
+    // Split by comma to handle multiple skills at once
+    const skillInputs = content.split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
 
     // Get existing thoughts for clustering
     const existingThoughts = dbAll('SELECT * FROM thoughts');
 
-    // Determine cluster
-    const cluster = determineCluster(keywords, existingThoughts, content);
+    const addedThoughts = [];
+    const allConnections = [];
 
-    // Insert the thought
-    const result = dbRun(
-      'INSERT INTO thoughts (content, keywords, cluster) VALUES (?, ?, ?)',
-      [content.trim(), JSON.stringify(keywords), cluster]
-    );
+    // Process each skill
+    skillInputs.forEach(skillContent => {
+      // Extract keywords
+      const keywords = extractKeywords(skillContent);
 
-    const newThought = dbGet('SELECT * FROM thoughts WHERE id = ?', [result.lastInsertRowid]);
+      // Determine cluster
+      const cluster = determineCluster(keywords, existingThoughts, skillContent);
 
-    // Create connections to similar thoughts
-    const newConnections = [];
-    existingThoughts.forEach(thought => {
-      if (!thought.keywords) return;
-      const thoughtKeywords = JSON.parse(thought.keywords);
-      const similarity = calculateSimilarity(keywords, thoughtKeywords);
+      // Insert the thought
+      const result = dbRun(
+        'INSERT INTO thoughts (content, keywords, cluster) VALUES (?, ?, ?)',
+        [skillContent, JSON.stringify(keywords), cluster]
+      );
 
-      if (similarity > 0.15) {
-        try {
-          dbRun(
-            'INSERT OR IGNORE INTO connections (source_id, target_id, strength) VALUES (?, ?, ?)',
-            [newThought.id, thought.id, similarity]
-          );
-          newConnections.push({
-            source_id: newThought.id,
-            target_id: thought.id,
-            strength: similarity
-          });
-        } catch (e) {}
-      }
-    });
+      const newThought = dbGet('SELECT * FROM thoughts WHERE id = ?', [result.lastInsertRowid]);
 
-    // Also connect thoughts in the same cluster with lower strength
-    existingThoughts.forEach(thought => {
-      if (thought.cluster === cluster && thought.id !== newThought.id) {
-        const existingConnection = dbGet(
-          'SELECT * FROM connections WHERE (source_id = ? AND target_id = ?) OR (source_id = ? AND target_id = ?)',
-          [newThought.id, thought.id, thought.id, newThought.id]
-        );
+      addedThoughts.push({
+        ...newThought,
+        keywords: JSON.parse(newThought.keywords || '[]')
+      });
 
-        if (!existingConnection) {
-          try {
-            dbRun(
-              'INSERT OR IGNORE INTO connections (source_id, target_id, strength) VALUES (?, ?, ?)',
-              [newThought.id, thought.id, 0.1]
-            );
-            newConnections.push({
-              source_id: newThought.id,
-              target_id: thought.id,
-              strength: 0.1
-            });
-          } catch (e) {}
-        }
-      }
+      // Add to existing thoughts for next iteration
+      existingThoughts.push(newThought);
     });
 
     saveDatabase();
 
+    // Return all added thoughts (supports single or multiple)
     res.json({
-      thought: {
-        ...newThought,
-        keywords: JSON.parse(newThought.keywords || '[]')
-      },
-      connections: newConnections
+      thought: addedThoughts[0],  // First one for backwards compatibility
+      thoughts: addedThoughts,     // All added thoughts
+      connections: []              // No connections needed
     });
   } catch (error) {
     console.error('Error adding thought:', error);
