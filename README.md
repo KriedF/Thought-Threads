@@ -59,4 +59,4 @@ You are free to use, modify, and distribute this software, but you must include 
 
 ---
 
-Created by **Fatima** · Built with 💜 for creative thinkers everywhere.
+Created by **Fatima Kried** · Built with 💜 for creative thinkers everywhere.
