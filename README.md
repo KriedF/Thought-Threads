@@ -2,8 +2,6 @@
 
 A career discovery tool that helps you visualize how your skills connect to different career paths. Enter your skills and watch them cluster into job categories, helping you discover career opportunities that match your abilities.
 
-![Skill Threads](https://via.placeholder.com/800x400?text=Skill+Threads+Visualization)
-
 ## Features
 
 - **Visual Skill Mapping**: Skills appear as colorful bubbles in an interactive force-directed graph
@@ -18,76 +16,6 @@ A career discovery tool that helps you visualize how your skills connect to diff
 - **Backend**: Node.js + Express
 - **Database**: SQLite (better-sqlite3) for persistence
 - **NLP**: Natural.js for keyword extraction and theme clustering
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+ installed
-- npm or yarn
-
-### Local Development
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/thought-threads.git
-   cd thought-threads
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   cd client && npm install && cd ..
-   ```
-
-3. **Start development servers**
-   ```bash
-   npm run dev
-   ```
-
-   This starts both the backend (port 3001) and frontend (port 3000).
-
-4. **Open in browser**
-   ```
-   http://localhost:3000
-   ```
-
-### Production Build
-
-```bash
-npm run build
-npm start
-```
-
-## Deploy to Render
-
-### Option 1: One-Click Deploy
-
-1. Fork this repository to your GitHub account
-2. Go to [Render Dashboard](https://dashboard.render.com)
-3. Click **New** → **Blueprint**
-4. Connect your GitHub account and select the forked repository
-5. Render will automatically detect the `render.yaml` and configure everything
-6. Click **Apply** to deploy
-
-### Option 2: Manual Deploy
-
-1. Go to [Render Dashboard](https://dashboard.render.com)
-2. Click **New** → **Web Service**
-3. Connect your GitHub repository
-4. Configure the service:
-   - **Name**: thought-threads
-   - **Runtime**: Node
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-5. Add environment variables:
-   - `NODE_ENV`: production
-   - `DATABASE_PATH`: /opt/render/project/src/data/thoughts.db
-6. Add a disk:
-   - **Name**: thought-threads-data
-   - **Mount Path**: /opt/render/project/src/data
-   - **Size**: 1 GB
-7. Click **Create Web Service**
 
 ## API Endpoints
 
@@ -125,10 +53,10 @@ skill-threads/
 
 ## License
 
-MIT License © 2026 Fatima
+MIT License © 2026 Fatima Kried
 
 You are free to use, modify, and distribute this software, but you must include the original copyright notice and license. See [LICENSE](LICENSE) for details.
 
 ---
 
-Created by **Fatima** · Built with 💜 to help people discover their career paths.
+Created by **Fatima Kried** · Built with 💜 to help people discover their career paths.
