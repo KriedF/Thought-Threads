@@ -380,10 +380,10 @@ function App() {
     <div className="app">
       <header className="header">
         <div className="logo">
-          <span className="logo-icon">💭</span>
-          <h1>Thought Threads</h1>
+          <span className="logo-icon">🎯</span>
+          <h1>Skill Threads</h1>
         </div>
-        <p className="tagline">Drop in a thought, watch ideas connect</p>
+        <p className="tagline">Enter your skills, discover career paths</p>
       </header>
 
       <form className="input-container" onSubmit={addThought}>
@@ -391,12 +391,12 @@ function App() {
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="What's on your mind?"
+          placeholder="Enter a skill (e.g., Python, project management, sales...)"
           className="thought-input"
           autoFocus
         />
         <button type="submit" className="add-button">
-          Add Thought
+          Add Skill
         </button>
       </form>
 
@@ -404,7 +404,7 @@ function App() {
 
       {clusters.length > 0 && (
         <div className="legend">
-          <h3>Themes</h3>
+          <h3>Career Paths</h3>
           <div className="legend-items">
             {clusters.map(cluster => (
               <div key={cluster} className="legend-item">
@@ -422,7 +422,7 @@ function App() {
       {selectedThought && (
         <div className="detail-panel">
           <button className="close-button" onClick={() => setSelectedThought(null)}>×</button>
-          <h3>Thought Details</h3>
+          <h3>Skill Details</h3>
           <p className="detail-content">{selectedThought.content}</p>
           <div className="detail-meta">
             <span className="detail-cluster" style={{ background: getClusterColor(selectedThought.cluster) }}>
@@ -437,7 +437,7 @@ function App() {
             )}
           </div>
           <button className="delete-button" onClick={() => deleteThought(selectedThought.id)}>
-            Delete Thought
+            Delete Skill
           </button>
         </div>
       )}
@@ -451,14 +451,14 @@ function App() {
       {isLoading && (
         <div className="loading">
           <div className="loading-spinner" />
-          <p>Loading thoughts...</p>
+          <p>Loading skills...</p>
         </div>
       )}
 
       {!isLoading && thoughts.length === 0 && (
         <div className="empty-state">
-          <p>✨ Start by adding your first thought above</p>
-          <p className="hint">Related ideas will automatically cluster together</p>
+          <p>✨ Start by adding your first skill above</p>
+          <p className="hint">Related skills will cluster into career paths</p>
         </div>
       )}
     </div>

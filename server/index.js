@@ -11,6 +11,105 @@ const PORT = process.env.PORT || 3001;
 let db;
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'thoughts.db');
 
+// Simple stemmer (Porter-like, simplified) - defined early for use in category setup
+function stem(word) {
+  word = word.toLowerCase();
+  const suffixes = ['ing', 'ed', 'ly', 'er', 'est', 'ness', 'ment', 'tion', 'sion', 'ies', 's'];
+  for (const suffix of suffixes) {
+    if (word.length > suffix.length + 2 && word.endsWith(suffix)) {
+      if (suffix === 'ies') {
+        return word.slice(0, -3) + 'y';
+      }
+      return word.slice(0, -suffix.length);
+    }
+  }
+  return word;
+}
+
+// Job categories - maps skills to career paths
+const semanticCategories = {
+  // Software & Technology
+  'Software Development': ['programming', 'coding', 'developer', 'software', 'engineer', 'code', 'python', 'javascript', 'java', 'csharp', 'c++', 'ruby', 'php', 'swift', 'kotlin', 'golang', 'rust', 'typescript', 'react', 'angular', 'vue', 'node', 'nodejs', 'django', 'flask', 'rails', 'spring', 'dotnet', 'frontend', 'backend', 'fullstack', 'web', 'mobile', 'app', 'application', 'api', 'rest', 'graphql', 'microservices', 'database', 'sql', 'nosql', 'mongodb', 'postgresql', 'mysql', 'redis', 'elasticsearch', 'git', 'github', 'gitlab', 'agile', 'scrum', 'devops', 'cicd', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'cloud', 'linux', 'unix', 'bash', 'scripting', 'automation', 'testing', 'debugging', 'algorithms', 'oop', 'functional', 'architecture', 'scalable', 'performance', 'optimization', 'security', 'encryption', 'authentication', 'sdk', 'framework', 'library', 'npm', 'pip', 'maven', 'gradle', 'webpack', 'vite', 'compiler', 'ide', 'vscode', 'intellij', 'xcode', 'android', 'ios', 'flutter', 'reactnative', 'electron', 'saas', 'serverless', 'lambda', 'terraform', 'ansible', 'jenkins', 'jira'],
+
+  // Data Science & Analytics
+  'Data Science': ['data', 'analytics', 'analysis', 'analyst', 'statistics', 'statistical', 'machine', 'learning', 'ml', 'ai', 'artificial', 'intelligence', 'deep', 'neural', 'network', 'tensorflow', 'pytorch', 'pandas', 'numpy', 'scipy', 'sklearn', 'jupyter', 'notebook', 'visualization', 'tableau', 'powerbi', 'looker', 'dashboards', 'metrics', 'kpi', 'forecasting', 'predictive', 'modeling', 'regression', 'classification', 'clustering', 'nlp', 'computer', 'vision', 'bigdata', 'hadoop', 'spark', 'databricks', 'snowflake', 'etl', 'pipeline', 'warehouse', 'mining', 'insights', 'reporting', 'excel', 'spreadsheet', 'pivot', 'vlookup', 'quantitative', 'qualitative', 'research', 'hypothesis', 'experiment', 'ab', 'segmentation', 'cohort'],
+
+  // Design & Creative
+  'Design & Creative': ['design', 'designer', 'graphic', 'visual', 'ui', 'ux', 'user', 'experience', 'interface', 'figma', 'sketch', 'adobe', 'photoshop', 'illustrator', 'indesign', 'xd', 'creative', 'creativity', 'art', 'artistic', 'illustration', 'branding', 'brand', 'logo', 'typography', 'layout', 'composition', 'color', 'palette', 'mockup', 'wireframe', 'prototype', 'prototyping', 'animation', 'motion', 'video', 'editing', 'premiere', 'aftereffects', 'cinema4d', 'blender', '3d', 'rendering', 'photography', 'photographer', 'lightroom', 'retouching', 'print', 'packaging', 'responsive', 'interaction', 'usability', 'accessibility', 'portfolio', 'aesthetic', 'style', 'trend', 'concept', 'storyboard', 'drawing', 'paint'],
+
+  // Marketing & Sales
+  'Marketing & Sales': ['marketing', 'marketer', 'sales', 'selling', 'salesperson', 'advertising', 'ads', 'campaign', 'digital', 'social', 'media', 'content', 'seo', 'sem', 'ppc', 'google', 'facebook', 'instagram', 'linkedin', 'twitter', 'tiktok', 'influencer', 'email', 'newsletter', 'hubspot', 'salesforce', 'crm', 'lead', 'leads', 'generation', 'conversion', 'funnel', 'prospect', 'prospecting', 'cold', 'calling', 'outreach', 'pitch', 'presentation', 'demo', 'negotiation', 'closing', 'quota', 'target', 'revenue', 'growth', 'acquisition', 'retention', 'loyalty', 'awareness', 'engagement', 'roi', 'budget', 'strategy', 'planning', 'market', 'competitor', 'pricing', 'promotion', 'pr', 'public', 'relations', 'communications', 'copywriting', 'copy', 'headline', 'cta', 'affiliate', 'partnership', 'b2b', 'b2c', 'ecommerce', 'retail'],
+
+  // Healthcare & Medical
+  'Healthcare': ['healthcare', 'health', 'medical', 'medicine', 'clinical', 'patient', 'care', 'nursing', 'nurse', 'rn', 'lpn', 'cna', 'doctor', 'physician', 'surgeon', 'surgery', 'diagnosis', 'treatment', 'therapy', 'therapist', 'physical', 'occupational', 'speech', 'respiratory', 'pharmacy', 'pharmacist', 'pharmaceutical', 'drug', 'medication', 'prescription', 'hospital', 'clinic', 'emergency', 'icu', 'lab', 'laboratory', 'technician', 'radiology', 'xray', 'mri', 'ultrasound', 'imaging', 'pathology', 'anatomy', 'physiology', 'cardiology', 'neurology', 'oncology', 'pediatrics', 'geriatrics', 'psychiatry', 'psychology', 'mental', 'dental', 'dentist', 'hygienist', 'orthodontist', 'optometry', 'optometrist', 'hearing', 'audiology', 'emt', 'paramedic', 'firstaid', 'cpr', 'hipaa', 'ehr', 'emr', 'epic', 'charting', 'vitals', 'insurance', 'billing', 'icd', 'cpt'],
+
+  // Finance & Accounting
+  'Finance & Accounting': ['finance', 'financial', 'accounting', 'accountant', 'cpa', 'bookkeeping', 'bookkeeper', 'audit', 'auditor', 'tax', 'taxes', 'taxation', 'budget', 'budgeting', 'forecast', 'investment', 'investing', 'investor', 'banking', 'bank', 'loan', 'credit', 'debt', 'equity', 'stock', 'stocks', 'bond', 'bonds', 'portfolio', 'asset', 'liability', 'balance', 'sheet', 'income', 'statement', 'cashflow', 'expense', 'profit', 'loss', 'margin', 'gaap', 'ifrs', 'quickbooks', 'sage', 'sap', 'oracle', 'erp', 'payroll', 'ap', 'ar', 'receivable', 'payable', 'reconciliation', 'journal', 'ledger', 'entries', 'depreciation', 'amortization', 'accrual', 'compliance', 'regulatory', 'sec', 'sox', 'risk', 'underwriting', 'actuary', 'wealth', 'management', 'advisory', 'cfp', 'cfa', 'series', 'trading', 'trader', 'fintech', 'blockchain', 'crypto'],
+
+  // Education & Training
+  'Education & Training': ['education', 'teaching', 'teacher', 'instructor', 'professor', 'tutor', 'tutoring', 'curriculum', 'lesson', 'plan', 'classroom', 'student', 'students', 'learning', 'training', 'trainer', 'development', 'instructional', 'elearning', 'online', 'course', 'courses', 'workshop', 'seminar', 'lecture', 'assessment', 'grading', 'evaluation', 'feedback', 'coaching', 'coach', 'mentoring', 'mentor', 'counseling', 'counselor', 'guidance', 'academic', 'school', 'college', 'university', 'k12', 'elementary', 'middle', 'high', 'preschool', 'early', 'childhood', 'special', 'needs', 'esl', 'english', 'language', 'math', 'science', 'history', 'reading', 'writing', 'literacy', 'stem', 'steam', 'certification', 'credential', 'degree', 'masters', 'phd', 'scholarship', 'grant', 'lms', 'canvas', 'blackboard', 'moodle', 'zoom', 'virtual', 'hybrid', 'remote'],
+
+  // Construction & Trades
+  'Construction & Trades': ['construction', 'building', 'builder', 'contractor', 'subcontractor', 'carpenter', 'carpentry', 'electrician', 'electrical', 'plumber', 'plumbing', 'hvac', 'heating', 'cooling', 'ventilation', 'welding', 'welder', 'masonry', 'mason', 'concrete', 'roofing', 'roofer', 'framing', 'drywall', 'painting', 'painter', 'flooring', 'tile', 'cabinet', 'millwork', 'renovation', 'remodel', 'remodeling', 'repair', 'maintenance', 'handyman', 'inspector', 'inspection', 'blueprint', 'plans', 'permits', 'code', 'safety', 'osha', 'tools', 'power', 'hand', 'equipment', 'heavy', 'machinery', 'crane', 'forklift', 'excavator', 'bulldozer', 'commercial', 'residential', 'industrial', 'infrastructure', 'civil', 'structural', 'mechanical', 'project', 'estimating', 'estimator', 'bidding', 'scheduling', 'site', 'supervisor', 'foreman', 'apprentice', 'journeyman', 'master', 'licensed', 'bonded', 'insured', 'union', 'trade', 'skilled', 'labor'],
+
+  // Customer Service & Support
+  'Customer Service': ['customer', 'service', 'support', 'representative', 'rep', 'agent', 'specialist', 'associate', 'help', 'desk', 'helpdesk', 'call', 'center', 'phone', 'chat', 'ticket', 'tickets', 'ticketing', 'zendesk', 'freshdesk', 'intercom', 'communication', 'communicating', 'listening', 'empathy', 'patience', 'problem', 'solving', 'resolution', 'escalation', 'complaint', 'complaints', 'satisfaction', 'nps', 'csat', 'relationship', 'client', 'clients', 'account', 'onboarding', 'documentation', 'knowledge', 'base', 'faq', 'troubleshooting', 'technical', 'returns', 'refunds', 'shipping', 'order', 'orders', 'inquiry', 'inquiries', 'followup', 'response', 'time', 'quality', 'assurance', 'qa', 'monitoring', 'performance'],
+
+  // Human Resources
+  'Human Resources': ['hr', 'human', 'resources', 'recruiting', 'recruiter', 'recruitment', 'talent', 'hiring', 'interview', 'interviewing', 'screening', 'sourcing', 'candidate', 'candidates', 'applicant', 'ats', 'workday', 'greenhouse', 'lever', 'job', 'posting', 'description', 'offer', 'orientation', 'performance', 'review', 'compensation', 'benefits', 'salary', 'bonus', 'insurance', 'retirement', '401k', 'pto', 'leave', 'policy', 'policies', 'handbook', 'labor', 'law', 'eeoc', 'ada', 'fmla', 'employee', 'engagement', 'culture', 'diversity', 'inclusion', 'dei', 'wellness', 'workers', 'comp', 'termination', 'offboarding', 'exit', 'hris', 'organizational', 'change'],
+
+  // Operations & Logistics
+  'Operations & Logistics': ['operations', 'logistics', 'supply', 'chain', 'procurement', 'purchasing', 'vendor', 'supplier', 'inventory', 'warehouse', 'warehousing', 'distribution', 'fulfillment', 'shipping', 'receiving', 'freight', 'transportation', 'trucking', 'driver', 'cdl', 'delivery', 'routing', 'tracking', 'customs', 'import', 'export', 'international', 'global', 'manufacturing', 'production', 'assembly', 'quality', 'control', 'qc', 'lean', 'six', 'sigma', 'kaizen', 'continuous', 'improvement', 'efficiency', 'optimization', 'capacity', 'demand', 'scheduling', 'coordination', 'wms', 'tms', 'rfid', 'barcode', 'scanning', 'picking', 'packing', 'loading', 'unloading', 'pallet', 'dock', 'fleet', 'cost', 'reduction'],
+
+  // Legal & Compliance
+  'Legal': ['legal', 'law', 'lawyer', 'attorney', 'paralegal', 'litigation', 'litigator', 'corporate', 'contract', 'contracts', 'agreement', 'negotiation', 'drafting', 'regulatory', 'regulation', 'governance', 'audit', 'investigation', 'discovery', 'brief', 'filing', 'court', 'trial', 'deposition', 'settlement', 'mediation', 'arbitration', 'intellectual', 'property', 'ip', 'patent', 'trademark', 'copyright', 'employment', 'immigration', 'bankruptcy', 'criminal', 'family', 'environmental', 'privacy', 'gdpr', 'ccpa', 'aml', 'kyc', 'ethics', 'responsibility', 'bar', 'jd', 'llm', 'westlaw', 'lexisnexis', 'clio', 'document', 'timekeeping'],
+
+  // Administrative & Office
+  'Administrative': ['administrative', 'admin', 'assistant', 'secretary', 'receptionist', 'office', 'manager', 'coordinator', 'executive', 'ea', 'calendar', 'meeting', 'meetings', 'travel', 'arrangements', 'booking', 'reports', 'invoicing', 'organization', 'organizing', 'correspondence', 'phone', 'calls', 'greeting', 'visitors', 'supplies', 'ordering', 'facilities', 'data', 'entry', 'typing', 'word', 'processing', 'microsoft', 'excel', 'powerpoint', 'outlook', 'docs', 'sheets', 'slides', 'teams', 'slack', 'multitasking', 'prioritization', 'time', 'detail', 'oriented', 'professional', 'confidential', 'discretion', 'clerical', 'records'],
+
+  // Project & Product Management
+  'Project Management': ['project', 'manager', 'pm', 'pmp', 'kanban', 'waterfall', 'methodology', 'sprint', 'backlog', 'roadmap', 'execution', 'controlling', 'scope', 'timeline', 'schedule', 'resource', 'allocation', 'mitigation', 'stakeholder', 'status', 'milestone', 'deliverable', 'dependency', 'critical', 'path', 'gantt', 'chart', 'asana', 'trello', 'monday', 'basecamp', 'smartsheet', 'ms', 'product', 'owner', 'po', 'requirements', 'story', 'stories', 'acceptance', 'criteria', 'mvp', 'launch', 'release', 'iteration', 'retrospective', 'standup', 'daily', 'cross', 'leadership'],
+
+  // Writing & Content
+  'Writing & Content': ['writing', 'writer', 'content', 'copywriting', 'copywriter', 'editor', 'proofreading', 'proofreader', 'author', 'journalist', 'journalism', 'reporter', 'blog', 'blogger', 'blogging', 'article', 'articles', 'post', 'posts', 'caption', 'script', 'scriptwriting', 'screenplay', 'documentation', 'manual', 'instructions', 'proposal', 'academic', 'essay', 'paper', 'thesis', 'dissertation', 'fiction', 'nonfiction', 'storytelling', 'narrative', 'ghostwriting', 'ghostwriter', 'keywords', 'cms', 'wordpress', 'drupal', 'medium', 'substack', 'grammar', 'ap', 'chicago', 'mla', 'apa', 'tone', 'voice', 'audience', 'publishing', 'publication', 'magazine', 'newspaper', 'book', 'ebook', 'press'],
+
+  // Engineering (Non-Software)
+  'Engineering': ['mechanical', 'civil', 'structural', 'chemical', 'aerospace', 'automotive', 'biomedical', 'petroleum', 'nuclear', 'materials', 'cad', 'autocad', 'solidworks', 'catia', 'inventor', 'revit', 'bim', 'simulation', 'fea', 'cfd', 'matlab', 'ansys', 'prototype', 'process', 'standards', 'specifications', 'regulations', 'codes', 'technical', 'drawing', 'schematic', 'circuit', 'pcb', 'plc', 'robotics', 'controls', 'instrumentation', 'reliability', 'pe', 'eit', 'fe', 'physics', 'calculus', 'thermodynamics', 'mechanics', 'dynamics', 'statics', 'fluids'],
+
+  // Hospitality & Food Service
+  'Hospitality': ['hospitality', 'hotel', 'resort', 'lodging', 'front', 'concierge', 'guest', 'services', 'housekeeping', 'housekeeper', 'bellhop', 'valet', 'restaurant', 'food', 'server', 'waiter', 'waitress', 'bartender', 'barista', 'host', 'hostess', 'busser', 'dishwasher', 'cook', 'chef', 'sous', 'line', 'prep', 'kitchen', 'culinary', 'catering', 'caterer', 'banquet', 'event', 'events', 'planner', 'venue', 'wedding', 'conference', 'casino', 'gaming', 'cruise', 'airline', 'flight', 'attendant', 'tourism', 'tour', 'reservation', 'menu', 'wine', 'sommelier', 'mixology', 'cocktail', 'servsafe', 'sanitation', 'pos', 'toast', 'opentable', 'tips', 'gratuity'],
+
+  // Security & Law Enforcement
+  'Security': ['security', 'guard', 'officer', 'patrol', 'surveillance', 'cctv', 'camera', 'alarm', 'access', 'badge', 'checkpoint', 'investigator', 'detective', 'forensic', 'evidence', 'incident', 'emergency', 'crisis', 'protection', 'loss', 'prevention', 'lp', 'assessment', 'threat', 'vulnerability', 'cybersecurity', 'cyber', 'infosec', 'firewall', 'penetration', 'soc', 'siem', 'police', 'sheriff', 'deputy', 'corrections', 'correctional', 'probation', 'parole', 'federal', 'fbi', 'dea', 'atf', 'tsa', 'border', 'military', 'veteran', 'armed', 'unarmed', 'cpl', 'first', 'aid'],
+
+  // Transportation & Driving
+  'Transportation': ['transportation', 'transport', 'truck', 'trucker', 'courier', 'dispatch', 'dispatcher', 'route', 'navigation', 'gps', 'vehicle', 'dot', 'fmcsa', 'hours', 'hos', 'eld', 'logbook', 'hazmat', 'tanker', 'flatbed', 'reefer', 'ltl', 'ftl', 'jack', 'bus', 'transit', 'passenger', 'uber', 'lyft', 'rideshare', 'taxi', 'limousine', 'chauffeur', 'pilot', 'aviation', 'captain', 'copilot', 'ground', 'crew', 'mechanic', 'railroad', 'train', 'conductor', 'maritime', 'ship', 'deckhand', 'regulations', 'endorsement', 'clean', 'record', 'background'],
+
+  // Real Estate & Property
+  'Real Estate': ['real', 'realtor', 'broker', 'brokerage', 'property', 'properties', 'residential', 'commercial', 'land', 'buying', 'listing', 'mls', 'showing', 'open', 'house', 'escrow', 'title', 'deed', 'mortgage', 'financing', 'preapproval', 'appraisal', 'appraiser', 'home', 'condo', 'townhouse', 'apartment', 'rental', 'lease', 'leasing', 'tenant', 'landlord', 'flip', 'flipping', 'cap', 'rate', 'cash', 'flow', 'appreciation', 'cma', 'zoning', 'staging', 'networking', 'referral', 'commission', 'continuing'],
+
+  // Science & Research
+  'Science & Research': ['scientist', 'researcher', 'experiment', 'experimental', 'theory', 'collection', 'methodology', 'protocol', 'procedure', 'observation', 'measurement', 'instrument', 'sample', 'specimen', 'culture', 'cell', 'molecular', 'biology', 'biologist', 'chemistry', 'chemist', 'physicist', 'biochemistry', 'microbiology', 'genetics', 'genomics', 'biotechnology', 'clinical', 'fda', 'gmp', 'glp', 'journal', 'peer', 'funding', 'nih', 'nsf', 'postdoc', 'computational', 'environmental', 'ecology', 'conservation', 'marine', 'geology', 'astronomy', 'space', 'nanotechnology'],
+
+  // General Skills
+  'General Skills': ['verbal', 'interpersonal', 'teamwork', 'collaboration', 'collaborative', 'leader', 'leading', 'supervising', 'delegation', 'motivating', 'thinking', 'strategic', 'adaptability', 'flexibility', 'resilience', 'stress', 'attention', 'accuracy', 'precision', 'initiative', 'proactive', 'self', 'starter', 'motivated', 'independent', 'autonomous', 'reliable', 'dependable', 'punctual', 'professionalism', 'ethical', 'integrity', 'honest', 'trustworthy', 'discrete', 'innovative', 'resourceful', 'bilingual', 'multilingual', 'spanish', 'french', 'chinese', 'mandarin', 'german', 'japanese', 'korean', 'arabic', 'portuguese', 'russian', 'hindi']
+};
+
+// Build reverse lookup: word -> category
+const wordToCategory = {};
+Object.entries(semanticCategories).forEach(([category, words]) => {
+  words.forEach(word => {
+    wordToCategory[word] = category;
+    wordToCategory[stem(word)] = category;
+  });
+});
+
+// Get semantic category for a word
+function getSemanticCategory(word) {
+  const lower = word.toLowerCase();
+  return wordToCategory[lower] || wordToCategory[stem(lower)] || null;
+}
+
 // Stop words to filter out
 const stopWords = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
@@ -29,22 +128,6 @@ const stopWords = new Set([
   'im', "i'm", "don't", "dont", "can't", "cant", "won't", "wont", "it's",
   'really', 'maybe', 'something', 'things', 'thing', 'much', 'many', 'well'
 ]);
-
-// Simple stemmer (Porter-like, simplified)
-function stem(word) {
-  word = word.toLowerCase();
-  // Remove common suffixes
-  const suffixes = ['ing', 'ed', 'ly', 'er', 'est', 'ness', 'ment', 'tion', 'sion', 'ies', 's'];
-  for (const suffix of suffixes) {
-    if (word.length > suffix.length + 2 && word.endsWith(suffix)) {
-      if (suffix === 'ies') {
-        return word.slice(0, -3) + 'y';
-      }
-      return word.slice(0, -suffix.length);
-    }
-  }
-  return word;
-}
 
 // Extract keywords from text
 function extractKeywords(text) {
@@ -65,27 +148,67 @@ function extractKeywords(text) {
   return Array.from(stemmedMap.values()).slice(0, 10);
 }
 
-// Calculate similarity between two thoughts based on keywords
+// Calculate similarity between two thoughts based on keywords and semantic categories
 function calculateSimilarity(keywords1, keywords2) {
   if (!keywords1.length || !keywords2.length) return 0;
 
   const set1 = new Set(keywords1.map(k => stem(k)));
   const set2 = new Set(keywords2.map(k => stem(k)));
 
+  // Direct keyword match
   let intersection = 0;
   set1.forEach(k => {
     if (set2.has(k)) intersection++;
   });
 
-  const union = set1.size + set2.size - intersection;
-  return union > 0 ? intersection / union : 0;
+  // Also check if keywords share semantic categories
+  const categories1 = new Set(keywords1.map(k => getSemanticCategory(k)).filter(Boolean));
+  const categories2 = new Set(keywords2.map(k => getSemanticCategory(k)).filter(Boolean));
+
+  let categoryOverlap = 0;
+  categories1.forEach(c => {
+    if (categories2.has(c)) categoryOverlap++;
+  });
+
+  // Combine direct matches with category matches
+  const directScore = set1.size + set2.size > 0 ? intersection / (set1.size + set2.size - intersection) : 0;
+  const categoryScore = categories1.size + categories2.size > 0 ? categoryOverlap / Math.max(categories1.size, categories2.size) : 0;
+
+  // Weight: 60% direct match, 40% category match
+  return directScore * 0.6 + categoryScore * 0.4;
 }
 
-// Determine cluster based on keywords
-function determineCluster(keywords, existingThoughts) {
-  if (!keywords.length) return 'general';
+// Determine cluster based on keywords and semantic categories
+function determineCluster(keywords, existingThoughts, content) {
+  // First, check if any keyword belongs to a semantic category
+  const categoryScores = {};
 
-  // Find the most common cluster among similar thoughts
+  // Check keywords against semantic categories
+  keywords.forEach(keyword => {
+    const category = getSemanticCategory(keyword);
+    if (category) {
+      categoryScores[category] = (categoryScores[category] || 0) + 2; // Strong weight for direct match
+    }
+  });
+
+  // Also check the full content for category words
+  const contentWords = content.toLowerCase().split(/\s+/);
+  contentWords.forEach(word => {
+    const category = getSemanticCategory(word);
+    if (category) {
+      categoryScores[category] = (categoryScores[category] || 0) + 1;
+    }
+  });
+
+  // If we found semantic categories, use the best one
+  const bestCategory = Object.entries(categoryScores)
+    .sort((a, b) => b[1] - a[1])[0];
+
+  if (bestCategory) {
+    return bestCategory[0];
+  }
+
+  // Fall back to checking similarity with existing thoughts
   const clusterScores = {};
 
   existingThoughts.forEach(thought => {
@@ -102,12 +225,12 @@ function determineCluster(keywords, existingThoughts) {
   const bestCluster = Object.entries(clusterScores)
     .sort((a, b) => b[1] - a[1])[0];
 
-  if (bestCluster && bestCluster[1] > 0.2) {
+  if (bestCluster && bestCluster[1] > 0.1) {
     return bestCluster[0];
   }
 
-  // Otherwise, create a new cluster based on the primary keyword
-  return keywords[0] || 'general';
+  // Default to 'ideas' for uncategorized thoughts
+  return 'ideas';
 }
 
 // Save database to file
@@ -240,7 +363,7 @@ app.post('/api/thoughts', (req, res) => {
     const existingThoughts = dbAll('SELECT * FROM thoughts');
 
     // Determine cluster
-    const cluster = determineCluster(keywords, existingThoughts);
+    const cluster = determineCluster(keywords, existingThoughts, content);
 
     // Insert the thought
     const result = dbRun(
