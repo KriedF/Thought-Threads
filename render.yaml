@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: thought-threads
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /opt/render/project/src/data/thoughts.db
+    disk:
+      name: thought-threads-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
