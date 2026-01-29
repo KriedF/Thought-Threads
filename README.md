@@ -125,8 +125,10 @@ thought-threads/
 
 ## License
 
-MIT License - feel free to use this for your own projects!
+MIT License © 2026 Fatima
+
+You are free to use, modify, and distribute this software, but you must include the original copyright notice and license. See [LICENSE](LICENSE) for details.
 
 ---
 
-Built with 💜 for creative thinkers everywhere.
+Created by **Fatima** · Built with 💜 for creative thinkers everywhere.
